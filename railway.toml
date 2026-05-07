@@ -1,0 +1,10 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "npm start"
+healthcheckPath = "/"
+
+[environments.production.variables]
+DATA_PATH = "/data/progress.json"
+NODE_ENV = "production"
