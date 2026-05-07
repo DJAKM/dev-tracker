@@ -2,17 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { readProgress, writeProgress, todayStr } from "@/lib/storage";
 
 export async function GET() {
-  const data = readProgress();
+  const data = await readProgress();
   return NextResponse.json(data);
 }
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const data = readProgress();
+  const data = await readProgress();
 
   if (body.action === "setStartDate") {
     data.startDate = body.date;
-    writeProgress(data);
+    await writeProgress(data);
     return NextResponse.json({ ok: true });
   }
 
@@ -25,14 +25,14 @@ export async function POST(req: NextRequest) {
     } else {
       data.completions[date].splice(idx, 1);
     }
-    writeProgress(data);
+    await writeProgress(data);
     return NextResponse.json({ ok: true, completions: data.completions[date] });
   }
 
   if (body.action === "markDayDone") {
     const date = todayStr();
     if (!data.completions[date]) data.completions[date] = [];
-    writeProgress(data);
+    await writeProgress(data);
     return NextResponse.json({ ok: true });
   }
 
