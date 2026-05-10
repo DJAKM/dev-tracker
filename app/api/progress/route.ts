@@ -22,8 +22,9 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const data = await readProgress(userId);
 
-  if (body.action === "setStartDate") {
-    data.startDate = body.date;
+  if (body.action === "setStartDate" || body.action === "resetStartDate") {
+    if (body.date) data.startDate = body.date;
+    else data.startDate = null; // triggers setup screen again
     await writeProgress(userId, data);
     return NextResponse.json({ ok: true });
   }

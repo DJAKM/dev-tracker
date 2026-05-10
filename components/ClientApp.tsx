@@ -6,6 +6,7 @@ import TodayTab from "@/components/TodayTab";
 import StreakTab from "@/components/StreakTab";
 import QuestionsTab from "@/components/QuestionsTab";
 import RoadmapTab from "@/components/RoadmapTab";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 type Tab = "today" | "streak" | "questions" | "roadmap";
 
@@ -35,6 +36,7 @@ export default function ClientApp({ userName, userImage }: Props) {
   const [progress, setProgress] = useState<ProgressData>({ startDate: null, completions: {}, questionsSeen: {} });
   const [loading, setLoading] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
 
   const today = getToday();
   const yesterday = getYesterday();
@@ -60,15 +62,19 @@ export default function ClientApp({ userName, userImage }: Props) {
 
   useEffect(() => { fetchProgress(); }, [fetchProgress]);
 
-  async function handleToggleTask(taskId: string) {
+  // Toggle task on any date (today, past, or future)
+  async function handleToggleTask(taskId: string, date: string) {
     const res = await fetch("/api/progress", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "toggleTask", date: today, taskId }),
+      body: JSON.stringify({ action: "toggleTask", date, taskId }),
     });
     const data = await res.json();
     if (data.ok) {
-      setProgress(prev => ({ ...prev, completions: { ...prev.completions, [today]: data.completions } }));
+      setProgress(prev => ({
+        ...prev,
+        completions: { ...prev.completions, [date]: data.completions },
+      }));
     }
   }
 
@@ -79,6 +85,24 @@ export default function ClientApp({ userName, userImage }: Props) {
       body: JSON.stringify({ action: "setStartDate", date }),
     });
     fetchProgress();
+  }
+
+  async function handleResetStart() {
+    // TodayTab opens its own confirm, this just receives the confirmed date
+    await fetch("/api/progress", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "resetStartDate" }),
+    });
+    fetchProgress();
+  }
+
+  async function handleSignOut() {
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = "/api/auth/signout";
+    document.body.appendChild(form);
+    form.submit();
   }
 
   if (loading) {
@@ -103,40 +127,56 @@ export default function ClientApp({ userName, userImage }: Props) {
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-          {progress.startDate && (
+          {progress.startDate && plan && (
             <div style={{ textAlign: "right" }}>
               <div style={{ fontSize: "0.75rem", color: "var(--accent)", fontWeight: 600 }}>
-                {plan ? `${(progress.completions[today] || []).length}/${plan.tasks.length} done` : "—"}
+                {(progress.completions[today] || []).length}/{plan.tasks.length} done
               </div>
             </div>
           )}
           {/* User avatar */}
           <div style={{ position: "relative" }}>
             <div onClick={() => setShowUserMenu(v => !v)}
-              style={{ width: 34, height: 34, borderRadius: "50%", background: "var(--accent)", cursor: "pointer", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.85rem", fontWeight: 700, border: "2px solid var(--border)" }}>
+              style={{ width: 34, height: 34, borderRadius: "50%", background: "var(--accent)", cursor: "pointer", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.85rem", fontWeight: 700, border: "2px solid var(--border)", flexShrink: 0 }}>
               {userImage
                 ? <img src={userImage} alt={userName ?? "User"} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                : (userName?.[0] ?? "U")}
+                : (userName?.[0]?.toUpperCase() ?? "U")}
             </div>
             {showUserMenu && (
-              <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, minWidth: 180, zIndex: 100, overflow: "hidden", boxShadow: "0 8px 24px rgba(0,0,0,0.4)" }}>
-                <div style={{ padding: "0.75rem 1rem", borderBottom: "1px solid var(--border)" }}>
-                  <div style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--text)" }}>{userName ?? "User"}</div>
-                  <div style={{ fontSize: "0.72rem", color: "var(--muted)" }}>Day {Math.max(dayNumber, 0)} of 120</div>
-                </div>
-                <form action="/api/auth/signout" method="POST">
-                  <button type="submit" style={{ width: "100%", padding: "0.75rem 1rem", background: "transparent", border: "none", color: "var(--red)", fontSize: "0.85rem", fontWeight: 600, cursor: "pointer", textAlign: "left" }}>
+              <>
+                {/* Close backdrop */}
+                <div onClick={() => setShowUserMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 99 }} />
+                <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, minWidth: 180, zIndex: 100, overflow: "hidden", boxShadow: "0 8px 24px rgba(0,0,0,0.4)" }}>
+                  <div style={{ padding: "0.75rem 1rem", borderBottom: "1px solid var(--border)" }}>
+                    <div style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--text)" }}>{userName ?? "User"}</div>
+                    <div style={{ fontSize: "0.72rem", color: "var(--muted)" }}>Day {Math.max(dayNumber, 0)} of 120</div>
+                  </div>
+                  <button
+                    onClick={() => { setShowUserMenu(false); setShowSignOutConfirm(true); }}
+                    style={{ width: "100%", padding: "0.75rem 1rem", background: "transparent", border: "none", color: "var(--red)", fontSize: "0.85rem", fontWeight: 600, cursor: "pointer", textAlign: "left" }}>
                     Sign out
                   </button>
-                </form>
-              </div>
+                </div>
+              </>
             )}
           </div>
         </div>
       </div>
 
       {/* Content */}
-      {tab === "today" && <TodayTab today={today} yesterday={yesterday} dayNumber={dayNumber} plan={plan} progress={progress} missedYesterday={missedYesterday} onToggleTask={handleToggleTask} onSetStart={handleSetStart} />}
+      {tab === "today" && (
+        <TodayTab
+          today={today}
+          yesterday={yesterday}
+          dayNumber={dayNumber}
+          plan={plan}
+          progress={progress}
+          missedYesterday={missedYesterday}
+          onToggleTask={handleToggleTask}
+          onSetStart={handleSetStart}
+          onResetStart={handleResetStart}
+        />
+      )}
       {tab === "streak" && <StreakTab progress={progress} today={today} dayNumber={dayNumber} />}
       {tab === "questions" && <QuestionsTab today={today} />}
       {tab === "roadmap" && <RoadmapTab progress={progress} today={today} dayNumber={dayNumber} />}
@@ -151,6 +191,18 @@ export default function ClientApp({ userName, userImage }: Props) {
           </button>
         ))}
       </div>
+
+      {/* Sign out confirmation */}
+      <ConfirmDialog
+        open={showSignOutConfirm}
+        title="Sign out?"
+        message="You'll need to sign back in to see your progress. Your data is saved — nothing will be lost."
+        confirmLabel="Sign out"
+        cancelLabel="Stay"
+        danger={false}
+        onConfirm={handleSignOut}
+        onCancel={() => setShowSignOutConfirm(false)}
+      />
     </div>
   );
 }
