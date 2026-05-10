@@ -33,7 +33,7 @@ interface Props {
 
 export default function ClientApp({ userName, userImage }: Props) {
   const [tab, setTab] = useState<Tab>("today");
-  const [progress, setProgress] = useState<ProgressData>({ startDate: null, completions: {}, questionsSeen: {} });
+  const [progress, setProgress] = useState<ProgressData>({ startDate: null, completions: {}, questionsSeen: {}, submissions: {} });
   const [loading, setLoading] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);

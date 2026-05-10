@@ -1,19 +1,29 @@
 import fs from "fs";
 import path from "path";
 
+export interface Submission {
+  id: string;           // nanoid
+  code: string;         // user's written attempt
+  submittedAt: string;  // ISO timestamp
+  revealedAnswer: boolean;
+  viewedSolution: boolean;
+  selfRating?: "wrong" | "partial" | "correct"; // set after reveal
+}
+
 export interface ProgressData {
   startDate: string | null;
-  completions: Record<string, string[]>;
-  questionsSeen: Record<string, string[]>;
+  completions: Record<string, string[]>;               // date  → taskId[]
+  questionsSeen: Record<string, string[]>;             // date  → questionId[]
+  submissions: Record<string, Submission[]>;           // questionId → Submission[]
 }
 
 const DEFAULT_DATA: ProgressData = {
   startDate: null,
   completions: {},
   questionsSeen: {},
+  submissions: {},
 };
 
-// Per-user Redis key
 const redisKey = (userId: string) => `devtracker:progress:${userId}`;
 
 // ─── Upstash Redis ─────────────────────────────────────────────────────────────
