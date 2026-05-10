@@ -4,20 +4,85 @@ export interface Question {
   difficulty: "easy" | "medium" | "hard";
   question: string;
   answer: string;
+  codeSolution?: string; // Only shown AFTER user reveals the answer (they must try first)
   tags: string[];
 }
 
 export const QUESTIONS: Question[] = [
   // ─── JavaScript Fundamentals ──────────────────────────────────────────
-  { id: "js-001", topic: "JavaScript", difficulty: "easy", question: "What is the difference between `==` and `===` in JavaScript?", answer: "`==` uses type coercion (loose equality): `'5' == 5` is `true`. `===` is strict equality — both value AND type must match: `'5' === 5` is `false`. Always prefer `===` to avoid subtle bugs.", tags: ["javascript", "basics"] },
+  { id: "js-001", topic: "JavaScript", difficulty: "easy", question: "What is the difference between `==` and `===` in JavaScript?", answer: "`==` uses type coercion (loose equality): `'5' == 5` is `true`. `===` is strict equality — both value AND type must match: `'5' === 5` is `false`. Always prefer `===` to avoid subtle bugs.", codeSolution: `// == coerces types before comparing
+console.log(0 == false)   // true  (false → 0)
+console.log('' == false)  // true  (both → 0)
+console.log(null == undefined) // true
+
+// === requires same type AND value
+console.log(0 === false)  // false
+console.log('' === false) // false
+console.log(null === undefined) // false
+
+// Always use === in production code
+function isLoggedIn(user) {
+  return user !== null && user !== undefined; // not != null
+}`, tags: ["javascript", "basics"] },
   { id: "js-002", topic: "JavaScript", difficulty: "easy", question: "What does `var`, `let`, and `const` differ in?", answer: "`var` is function-scoped and hoisted (initialized as `undefined`). `let` and `const` are block-scoped and NOT initialized when hoisted (Temporal Dead Zone). `const` can't be reassigned — but its properties can be mutated. Use `const` by default, `let` when you need to reassign.", tags: ["javascript", "scope"] },
   { id: "js-003", topic: "JavaScript", difficulty: "medium", question: "Explain JavaScript's event loop. What is the call stack vs the task queue?", answer: "JS is single-threaded. The call stack runs synchronous code. Async callbacks (setTimeout, fetch) go to the Web APIs → task queue (macrotask) or microtask queue (Promises). The event loop checks: is call stack empty? If yes, run ALL microtasks first, then ONE macrotask. This is why Promise.then() always runs before setTimeout.", tags: ["javascript", "async"] },
-  { id: "js-004", topic: "JavaScript", difficulty: "medium", question: "What is a closure in JavaScript? Give a real-world example.", answer: "A closure is a function that 'closes over' variables from its outer scope, keeping them alive even after the outer function returns. Real example: `function makeCounter() { let n = 0; return () => ++n; }` — the returned arrow function retains access to `n`. Used for private state, factory functions, memoization.", tags: ["javascript", "closures"] },
+  { id: "js-004", topic: "JavaScript", difficulty: "medium", question: "What is a closure in JavaScript? Give a real-world example.", answer: "A closure is a function that 'closes over' variables from its outer scope, keeping them alive even after the outer function returns. Real example: `function makeCounter() { let n = 0; return () => ++n; }` — the returned arrow function retains access to `n`. Used for private state, factory functions, memoization.", codeSolution: `// Counter — private state via closure
+function makeCounter(initial = 0) {
+  let count = initial; // private — not accessible outside
+  return {
+    increment: () => ++count,
+    decrement: () => --count,
+    value: () => count,
+    reset: () => { count = initial; },
+  };
+}
+
+const c = makeCounter(10);
+c.increment(); // 11
+c.increment(); // 12
+c.value();     // 12
+
+// Real use: debounce
+function debounce(fn, ms) {
+  let timerId;
+  return (...args) => {
+    clearTimeout(timerId);
+    timerId = setTimeout(() => fn(...args), ms);
+  };
+}
+
+const search = debounce((query) => fetchResults(query), 300);`, tags: ["javascript", "closures"] },
   { id: "js-005", topic: "JavaScript", difficulty: "hard", question: "What is prototypal inheritance? How does it differ from classical OOP?", answer: "JS objects have a `[[Prototype]]` chain. When you access a property, JS walks up the chain until found or null. `class` syntax is syntactic sugar over this — `class Foo extends Bar` sets `Foo.prototype.__proto__ = Bar.prototype`. Unlike classical OOP, instances share prototype methods (not copies), saving memory. Use `Object.create()` to set prototypes explicitly.", tags: ["javascript", "prototype"] },
   { id: "js-006", topic: "JavaScript", difficulty: "medium", question: "What is the difference between `Promise.all`, `Promise.race`, `Promise.allSettled`, and `Promise.any`?", answer: "`all`: resolves when ALL resolve, rejects immediately on first rejection. `race`: resolves/rejects with first settled promise. `allSettled`: always resolves with all results (fulfilled or rejected). `any`: resolves on first fulfilled, rejects (AggregateError) if all reject. Use `allSettled` for parallel calls where you need all results regardless.", tags: ["javascript", "async", "promises"] },
   { id: "js-007", topic: "JavaScript", difficulty: "easy", question: "What is the difference between `null` and `undefined`?", answer: "`undefined`: variable declared but not assigned, or function with no return. `null`: explicitly assigned 'no value'. `typeof undefined === 'undefined'`. `typeof null === 'object'` (historic bug). Use `=== null` to check for null. Both are falsy.", tags: ["javascript", "basics"] },
   { id: "js-008", topic: "JavaScript", difficulty: "medium", question: "How does `this` work in JavaScript? When does it change?", answer: "`this` is the object that owns the current function call. Rules: 1) Global context: window/global. 2) Object method: the object. 3) Arrow function: lexically inherits `this` from outer scope (never has own `this`). 4) `new`: the new instance. 5) `call/apply/bind`: explicitly set. Arrow functions are key for callbacks inside class methods.", tags: ["javascript", "this"] },
-  { id: "js-009", topic: "JavaScript", difficulty: "medium", question: "What is memoization? Implement a simple memoize function.", answer: "Memoization caches function results keyed by inputs. `function memoize(fn) { const cache = new Map(); return (...args) => { const key = JSON.stringify(args); if (cache.has(key)) return cache.get(key); const result = fn(...args); cache.set(key, result); return result; }; }`. Use for pure functions with expensive computations.", tags: ["javascript", "performance"] },
+  { id: "js-009", topic: "JavaScript", difficulty: "medium", question: "What is memoization? Implement a simple memoize function.", answer: "Memoization caches function results keyed by inputs. Use for pure functions with expensive computations.", codeSolution: `function memoize(fn) {
+  const cache = new Map();
+  return function(...args) {
+    const key = JSON.stringify(args);
+    if (cache.has(key)) {
+      console.log('cache hit:', key);
+      return cache.get(key);
+    }
+    const result = fn.apply(this, args);
+    cache.set(key, result);
+    return result;
+  };
+}
+
+// Example: expensive fibonacci
+const fib = memoize(function(n) {
+  if (n <= 1) return n;
+  return fib(n - 1) + fib(n - 2);
+});
+
+fib(40); // fast — each subproblem computed once
+
+// React equivalent: useMemo
+const expensiveValue = useMemo(
+  () => computeExpensiveValue(a, b),
+  [a, b] // only recomputes when a or b changes
+);`, tags: ["javascript", "performance"] },
   { id: "js-010", topic: "JavaScript", difficulty: "hard", question: "What are generators and when would you use them?", answer: "Generators are functions that can pause/resume execution via `yield`. `function* gen() { yield 1; yield 2; }`. The returned iterator has `.next()` which runs until the next yield. Use cases: lazy sequences, infinite iterators, async control flow (before async/await), implementing iterators for custom data structures.", tags: ["javascript", "advanced"] },
 
   // ─── TypeScript ───────────────────────────────────────────────────────
@@ -61,13 +126,259 @@ export const QUESTIONS: Question[] = [
   { id: "sys-006", topic: "System Design", difficulty: "hard", question: "How do you implement rate limiting?", answer: "Algorithms: 1) Token bucket: refill tokens at rate, consume per request. 2) Leaky bucket: fixed-rate queue. 3) Sliding window: count requests in rolling time window. Implement with Redis: `INCR user:123:minute:2024010112`, set TTL=60s. Upstash Redis is great for Edge rate limiting in Next.js middleware.", tags: ["system-design", "security"] },
 
   // ─── DSA Concepts ─────────────────────────────────────────────────────
-  { id: "dsa-001", topic: "Algorithms", difficulty: "easy", question: "What is Big-O notation? What is O(n log n)?", answer: "Big-O describes time/space complexity growth as input size n increases. O(1)=constant, O(log n)=halving each step (binary search), O(n)=linear, O(n log n)=sorting (merge/quick sort), O(n²)=nested loops, O(2ⁿ)=exponential. O(n log n) is optimal for comparison-based sorting.", tags: ["algorithms", "complexity"] },
-  { id: "dsa-002", topic: "Algorithms", difficulty: "medium", question: "Explain the two-pointer technique. When do you use it?", answer: "Two pointers reduce O(n²) to O(n) for sorted arrays. Patterns: 1) Opposite ends — close gap (Two Sum sorted, Container with Most Water). 2) Same direction — sliding window (max subarray). 3) Fast/slow — cycle detection (Floyd's algorithm). Key: works on sorted arrays or when order doesn't matter.", tags: ["algorithms", "patterns"] },
-  { id: "dsa-003", topic: "Algorithms", difficulty: "medium", question: "What is dynamic programming? How do you identify a DP problem?", answer: "DP solves problems by breaking into overlapping subproblems and caching results. Identify: 1) Optimal substructure (optimal solution uses optimal sub-solutions). 2) Overlapping subproblems (same sub-problems repeated). Signs: 'maximum', 'minimum', 'number of ways', 'can we reach'. Top-down = memoization (recursive + cache). Bottom-up = tabulation (iterative).", tags: ["algorithms", "dp"] },
-  { id: "dsa-004", topic: "Algorithms", difficulty: "hard", question: "Explain Dijkstra's algorithm. What problem does it solve?", answer: "Dijkstra finds shortest paths from a source to all nodes in a weighted graph (non-negative weights). Uses a min-heap: start with dist[src]=0, all others=∞. Pop minimum, relax neighbors. O((V+E) log V) with binary heap. Fails with negative weights — use Bellman-Ford instead. Used in GPS, network routing.", tags: ["algorithms", "graphs"] },
-  { id: "dsa-005", topic: "Algorithms", difficulty: "medium", question: "What is a hash table? What causes collisions and how are they resolved?", answer: "Hash table maps keys to values via a hash function → array index. Collisions (two keys → same index): 1) Chaining: each bucket is a linked list. 2) Open addressing: probe next empty slot (linear, quadratic, double hashing). JS Map uses a hash table. Good hash function minimizes collisions. Load factor > 0.75 triggers resize.", tags: ["data-structures"] },
-  { id: "dsa-006", topic: "Algorithms", difficulty: "medium", question: "When do you use DFS vs BFS?", answer: "DFS: deep first, uses stack (or recursion). Use for: cycle detection, topological sort, connected components, finding paths in a maze, tree depth. BFS: level by level, uses queue. Use for: shortest path in unweighted graph, level-order tree traversal, finding nearest node. BFS is better for 'closest' problems.", tags: ["algorithms", "graphs"] },
-  { id: "dsa-007", topic: "Algorithms", difficulty: "hard", question: "What is the difference between a heap and a BST?", answer: "Heap: complete binary tree, parent > children (max-heap). O(log n) insert/delete, O(1) get-max/min. Not searchable. Used for priority queues, heap sort. BST: left < node < right. O(log n) search/insert/delete (balanced). Searchable, ordered. Balanced BSTs (AVL, Red-Black) maintain O(log n) guarantees.", tags: ["data-structures"] },
+  { id: "dsa-001", topic: "Algorithms", difficulty: "easy", question: "What is Big-O notation? What is O(n log n)?", answer: "Big-O describes time/space complexity growth as input size n increases. O(1)=constant, O(log n)=halving each step (binary search), O(n)=linear, O(n log n)=sorting (merge/quick sort), O(n²)=nested loops, O(2ⁿ)=exponential. O(n log n) is optimal for comparison-based sorting.", codeSolution: `// O(1) — constant
+function getFirst(arr) { return arr[0]; }
+
+// O(log n) — binary search: halves problem each step
+function binarySearch(arr, target) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid] === target) return mid;
+    arr[mid] < target ? lo = mid + 1 : hi = mid - 1;
+  }
+  return -1;
+}
+
+// O(n) — linear scan
+function findMax(arr) {
+  return arr.reduce((max, n) => n > max ? n : max, -Infinity);
+}
+
+// O(n²) — nested loops (avoid!)
+function hasDuplicate_slow(arr) {
+  for (let i = 0; i < arr.length; i++)
+    for (let j = i + 1; j < arr.length; j++)
+      if (arr[i] === arr[j]) return true;
+  return false;
+}
+
+// O(n) — hash set (better!)
+function hasDuplicate_fast(arr) {
+  return new Set(arr).size !== arr.length;
+}`, tags: ["algorithms", "complexity"] },
+  { id: "dsa-002", topic: "Algorithms", difficulty: "medium", question: "Explain the two-pointer technique. When do you use it?", answer: "Two pointers reduce O(n²) to O(n) for sorted arrays. Patterns: 1) Opposite ends — close gap (Two Sum sorted, Container with Most Water). 2) Same direction — sliding window (max subarray). 3) Fast/slow — cycle detection (Floyd's algorithm). Key: works on sorted arrays or when order doesn't matter.", codeSolution: `// Pattern 1: Opposite ends — Two Sum (sorted array)
+function twoSumSorted(nums, target) {
+  let lo = 0, hi = nums.length - 1;
+  while (lo < hi) {
+    const sum = nums[lo] + nums[hi];
+    if (sum === target) return [lo, hi];
+    sum < target ? lo++ : hi--;
+  }
+  return [];
+}
+
+// Pattern 2: Sliding window — max sum subarray of size k
+function maxSumSubarray(nums, k) {
+  let sum = nums.slice(0, k).reduce((a, b) => a + b, 0);
+  let max = sum;
+  for (let i = k; i < nums.length; i++) {
+    sum += nums[i] - nums[i - k];
+    max = Math.max(max, sum);
+  }
+  return max;
+}
+
+// Pattern 3: Fast/slow — detect cycle in linked list
+function hasCycle(head) {
+  let slow = head, fast = head;
+  while (fast && fast.next) {
+    slow = slow.next;
+    fast = fast.next.next;
+    if (slow === fast) return true;
+  }
+  return false;
+}`, tags: ["algorithms", "patterns"] },
+  { id: "dsa-003", topic: "Algorithms", difficulty: "medium", question: "What is dynamic programming? How do you identify a DP problem?", answer: "DP solves problems by breaking into overlapping subproblems and caching results. Identify: 1) Optimal substructure (optimal solution uses optimal sub-solutions). 2) Overlapping subproblems (same sub-problems repeated). Signs: 'maximum', 'minimum', 'number of ways', 'can we reach'. Top-down = memoization (recursive + cache). Bottom-up = tabulation (iterative).", codeSolution: `// Classic: Climbing Stairs (LeetCode #70)
+// How many ways to reach step n, taking 1 or 2 steps?
+
+// Top-down (memoization)
+function climbStairs_memo(n, memo = {}) {
+  if (n <= 2) return n;
+  if (memo[n]) return memo[n];
+  memo[n] = climbStairs_memo(n - 1, memo) + climbStairs_memo(n - 2, memo);
+  return memo[n];
+}
+
+// Bottom-up (tabulation) — O(n) time, O(1) space
+function climbStairs(n) {
+  if (n <= 2) return n;
+  let prev2 = 1, prev1 = 2;
+  for (let i = 3; i <= n; i++) {
+    [prev2, prev1] = [prev1, prev1 + prev2];
+  }
+  return prev1;
+}
+
+// House Robber (LeetCode #198)
+function rob(nums) {
+  let prev2 = 0, prev1 = 0;
+  for (const n of nums) {
+    [prev2, prev1] = [prev1, Math.max(prev1, prev2 + n)];
+  }
+  return prev1;
+}`, tags: ["algorithms", "dp"] },
+  { id: "dsa-004", topic: "Algorithms", difficulty: "hard", question: "Explain Dijkstra's algorithm. What problem does it solve?", answer: "Dijkstra finds shortest paths from a source to all nodes in a weighted graph (non-negative weights). Uses a min-heap: start with dist[src]=0, all others=∞. Pop minimum, relax neighbors. O((V+E) log V) with binary heap. Fails with negative weights — use Bellman-Ford instead. Used in GPS, network routing.", codeSolution: `// Dijkstra's shortest path (min-heap via sorted array for simplicity)
+function dijkstra(graph, start) {
+  // graph: { node: [[neighbor, weight], ...] }
+  const dist = {};
+  for (const node in graph) dist[node] = Infinity;
+  dist[start] = 0;
+
+  // Min-heap: [distance, node]
+  const heap = [[0, start]];
+
+  while (heap.length) {
+    heap.sort((a, b) => a[0] - b[0]);
+    const [d, node] = heap.shift();
+
+    if (d > dist[node]) continue; // stale entry
+
+    for (const [neighbor, weight] of graph[node]) {
+      const newDist = dist[node] + weight;
+      if (newDist < dist[neighbor]) {
+        dist[neighbor] = newDist;
+        heap.push([newDist, neighbor]);
+      }
+    }
+  }
+  return dist;
+}
+
+// Example
+const graph = {
+  A: [['B', 4], ['C', 2]],
+  B: [['D', 3]],
+  C: [['B', 1], ['D', 5]],
+  D: [],
+};
+dijkstra(graph, 'A'); // { A: 0, B: 3, C: 2, D: 6 }`, tags: ["algorithms", "graphs"] },
+  { id: "dsa-005", topic: "Algorithms", difficulty: "medium", question: "What is a hash table? What causes collisions and how are they resolved?", answer: "Hash table maps keys to values via a hash function → array index. Collisions (two keys → same index): 1) Chaining: each bucket is a linked list. 2) Open addressing: probe next empty slot (linear, quadratic, double hashing). JS Map uses a hash table. Good hash function minimizes collisions. Load factor > 0.75 triggers resize.", codeSolution: `// JS Map IS a hash table — O(1) average get/set
+const map = new Map();
+map.set('key', 'value');
+map.get('key'); // 'value'
+map.has('key'); // true
+
+// Common interview pattern: frequency count
+function twoSum(nums, target) {
+  const seen = new Map(); // value → index
+  for (let i = 0; i < nums.length; i++) {
+    const complement = target - nums[i];
+    if (seen.has(complement)) {
+      return [seen.get(complement), i];
+    }
+    seen.set(nums[i], i);
+  }
+  return [];
+}
+
+// Group anagrams: sort letters as key
+function groupAnagrams(strs) {
+  const map = new Map();
+  for (const s of strs) {
+    const key = s.split('').sort().join('');
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(s);
+  }
+  return [...map.values()];
+}`, tags: ["data-structures"] },
+  { id: "dsa-006", topic: "Algorithms", difficulty: "medium", question: "When do you use DFS vs BFS?", answer: "DFS: deep first, uses stack (or recursion). Use for: cycle detection, topological sort, connected components, finding paths in a maze, tree depth. BFS: level by level, uses queue. Use for: shortest path in unweighted graph, level-order tree traversal, finding nearest node. BFS is better for 'closest' problems.", codeSolution: `// DFS — recursive (tree/graph)
+function dfs(node, visited = new Set()) {
+  if (!node || visited.has(node.val)) return;
+  visited.add(node.val);
+  console.log(node.val);
+  for (const neighbor of node.neighbors) dfs(neighbor, visited);
+}
+
+// DFS — iterative (explicit stack)
+function dfsIterative(root) {
+  const stack = [root], result = [];
+  while (stack.length) {
+    const node = stack.pop();
+    result.push(node.val);
+    for (const child of node.children.reverse()) stack.push(child);
+  }
+  return result;
+}
+
+// BFS — always iterative with queue
+function bfs(root) {
+  const queue = [root], result = [];
+  while (queue.length) {
+    const node = queue.shift();
+    result.push(node.val);
+    for (const child of node.children) queue.push(child);
+  }
+  return result;
+}
+
+// BFS for shortest path (unweighted graph)
+function shortestPath(graph, start, end) {
+  const queue = [[start, 0]], visited = new Set([start]);
+  while (queue.length) {
+    const [node, dist] = queue.shift();
+    if (node === end) return dist;
+    for (const neighbor of graph[node]) {
+      if (!visited.has(neighbor)) {
+        visited.add(neighbor);
+        queue.push([neighbor, dist + 1]);
+      }
+    }
+  }
+  return -1;
+}`, tags: ["algorithms", "graphs"] },
+  { id: "dsa-007", topic: "Algorithms", difficulty: "hard", question: "What is the difference between a heap and a BST?", answer: "Heap: complete binary tree, parent > children (max-heap). O(log n) insert/delete, O(1) get-max/min. Not searchable. Used for priority queues, heap sort. BST: left < node < right. O(log n) search/insert/delete (balanced). Searchable, ordered. Balanced BSTs (AVL, Red-Black) maintain O(log n) guarantees.", codeSolution: `// Min-heap implementation (for priority queue pattern)
+class MinHeap {
+  constructor() { this.data = []; }
+
+  push(val) {
+    this.data.push(val);
+    this._bubbleUp(this.data.length - 1);
+  }
+
+  pop() {
+    const min = this.data[0];
+    const last = this.data.pop();
+    if (this.data.length) {
+      this.data[0] = last;
+      this._sinkDown(0);
+    }
+    return min;
+  }
+
+  peek() { return this.data[0]; }
+  size() { return this.data.length; }
+
+  _bubbleUp(i) {
+    while (i > 0) {
+      const parent = (i - 1) >> 1;
+      if (this.data[parent] <= this.data[i]) break;
+      [this.data[parent], this.data[i]] = [this.data[i], this.data[parent]];
+      i = parent;
+    }
+  }
+
+  _sinkDown(i) {
+    const n = this.data.length;
+    while (true) {
+      let smallest = i;
+      const l = 2 * i + 1, r = 2 * i + 2;
+      if (l < n && this.data[l] < this.data[smallest]) smallest = l;
+      if (r < n && this.data[r] < this.data[smallest]) smallest = r;
+      if (smallest === i) break;
+      [this.data[smallest], this.data[i]] = [this.data[i], this.data[smallest]];
+      i = smallest;
+    }
+  }
+}
+
+// Use: Kth largest element
+const heap = new MinHeap();
+for (const n of [3,2,1,5,6,4]) {
+  heap.push(n);
+  if (heap.size() > 2) heap.pop(); // keep only 2 largest
+}
+heap.peek(); // 5 (2nd largest)`, tags: ["data-structures"] },
 
   // ─── Testing ──────────────────────────────────────────────────────────
   { id: "test-001", topic: "Testing", difficulty: "easy", question: "What is the difference between unit, integration, and E2E tests?", answer: "Unit: tests one function/component in isolation (fast, cheap, brittle to refactor). Integration: tests multiple units working together (balanced). E2E: tests full user flows in a browser (slow, expensive, high confidence). Testing Trophy (Kent C. Dodds): mostly integration tests, fewer unit/E2E. Test behavior, not implementation.", tags: ["testing"] },

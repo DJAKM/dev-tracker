@@ -3,8 +3,8 @@ import path from "path";
 
 export interface ProgressData {
   startDate: string | null;
-  completions: Record<string, string[]>; // date -> task ids
-  questionsSeen: Record<string, string[]>; // date -> question ids
+  completions: Record<string, string[]>;
+  questionsSeen: Record<string, string[]>;
 }
 
 const DEFAULT_DATA: ProgressData = {
@@ -13,57 +13,58 @@ const DEFAULT_DATA: ProgressData = {
   questionsSeen: {},
 };
 
-const REDIS_KEY = "devtracker:progress";
+// Per-user Redis key
+const redisKey = (userId: string) => `devtracker:progress:${userId}`;
 
-// ─── Upstash Redis (Vercel production) ────────────────────────────────────────
-async function redisRead(): Promise<ProgressData> {
+// ─── Upstash Redis ─────────────────────────────────────────────────────────────
+async function redisRead(userId: string): Promise<ProgressData> {
   const { Redis } = await import("@upstash/redis");
   const redis = new Redis({
     url: process.env.UPSTASH_REDIS_REST_URL!,
     token: process.env.UPSTASH_REDIS_REST_TOKEN!,
   });
-  const data = await redis.get<ProgressData>(REDIS_KEY);
-  return data ? { ...DEFAULT_DATA, ...data } : DEFAULT_DATA;
+  const data = await redis.get<ProgressData>(redisKey(userId));
+  return data ? { ...DEFAULT_DATA, ...data } : { ...DEFAULT_DATA };
 }
 
-async function redisWrite(data: ProgressData): Promise<void> {
+async function redisWrite(userId: string, data: ProgressData): Promise<void> {
   const { Redis } = await import("@upstash/redis");
   const redis = new Redis({
     url: process.env.UPSTASH_REDIS_REST_URL!,
     token: process.env.UPSTASH_REDIS_REST_TOKEN!,
   });
-  await redis.set(REDIS_KEY, data);
+  await redis.set(redisKey(userId), data);
 }
 
-// ─── Local JSON file (development) ────────────────────────────────────────────
-const DATA_FILE = process.env.DATA_PATH || path.join(process.cwd(), "data", "progress.json");
+// ─── Local JSON file (development) ─────────────────────────────────────────────
+const DATA_DIR = process.env.DATA_PATH || path.join(process.cwd(), "data");
 
-function fileRead(): ProgressData {
+function fileRead(userId: string): ProgressData {
   try {
-    if (!fs.existsSync(DATA_FILE)) return DEFAULT_DATA;
-    const raw = fs.readFileSync(DATA_FILE, "utf-8");
-    return { ...DEFAULT_DATA, ...JSON.parse(raw) };
+    const file = path.join(DATA_DIR, `progress-${userId}.json`);
+    if (!fs.existsSync(file)) return { ...DEFAULT_DATA };
+    return { ...DEFAULT_DATA, ...JSON.parse(fs.readFileSync(file, "utf-8")) };
   } catch {
-    return DEFAULT_DATA;
+    return { ...DEFAULT_DATA };
   }
 }
 
-function fileWrite(data: ProgressData): void {
-  const dir = path.dirname(DATA_FILE);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), "utf-8");
+function fileWrite(userId: string, data: ProgressData): void {
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  const file = path.join(DATA_DIR, `progress-${userId}.json`);
+  fs.writeFileSync(file, JSON.stringify(data, null, 2), "utf-8");
 }
 
-// ─── Unified API ──────────────────────────────────────────────────────────────
+// ─── Unified API ───────────────────────────────────────────────────────────────
 const useRedis = () =>
   !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
 
-export async function readProgress(): Promise<ProgressData> {
-  return useRedis() ? redisRead() : fileRead();
+export async function readProgress(userId: string): Promise<ProgressData> {
+  return useRedis() ? redisRead(userId) : fileRead(userId);
 }
 
-export async function writeProgress(data: ProgressData): Promise<void> {
-  return useRedis() ? redisWrite(data) : fileWrite(data);
+export async function writeProgress(userId: string, data: ProgressData): Promise<void> {
+  return useRedis() ? redisWrite(userId, data) : fileWrite(userId, data);
 }
 
 export function todayStr(): string {
