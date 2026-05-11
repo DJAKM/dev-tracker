@@ -1,13 +1,16 @@
 {
-  "name": "DevTracker",
+  "name": "DevTracker — 4-Month Career Plan",
   "short_name": "DevTracker",
-  "description": "4-Month Developer Career Plan",
+  "description": "Track daily coding progress, flashcards, and your 4-month developer roadmap",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#0f172a",
-  "theme_color": "#6366f1",
+  "theme_color": "#0f172a",
+  "categories": ["education", "productivity"],
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ]
 }
