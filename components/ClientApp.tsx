@@ -110,11 +110,8 @@ export default function ClientApp({ userName, userImage }: Props) {
   }
 
   async function handleSignOut() {
-    const form = document.createElement("form");
-    form.method = "POST";
-    form.action = "/api/auth/signout";
-    document.body.appendChild(form);
-    form.submit();
+    await fetch("/api/auth/signout", { method: "POST" });
+    window.location.href = "/signin";
   }
 
   if (loading) {
