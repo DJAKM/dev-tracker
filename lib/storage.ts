@@ -15,6 +15,7 @@ export interface ProgressData {
   completions: Record<string, string[]>;               // date  → taskId[]
   questionsSeen: Record<string, string[]>;             // date  → questionId[]
   submissions: Record<string, Submission[]>;           // questionId → Submission[]
+  articlesRead: Record<string, boolean>;               // dayNumber string → true
 }
 
 const DEFAULT_DATA: ProgressData = {
@@ -22,6 +23,7 @@ const DEFAULT_DATA: ProgressData = {
   completions: {},
   questionsSeen: {},
   submissions: {},
+  articlesRead: {},
 };
 
 const redisKey = (userId: string) => `devtracker:progress:${userId}`;

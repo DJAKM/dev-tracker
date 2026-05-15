@@ -33,7 +33,7 @@ interface Props {
 
 export default function ClientApp({ userName, userImage }: Props) {
   const [tab, setTab] = useState<Tab>("today");
-  const [progress, setProgress] = useState<ProgressData>({ startDate: null, completions: {}, questionsSeen: {}, submissions: {} });
+  const [progress, setProgress] = useState<ProgressData>({ startDate: null, completions: {}, questionsSeen: {}, submissions: {}, articlesRead: {} });
   const [loading, setLoading] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
@@ -95,6 +95,18 @@ export default function ClientApp({ userName, userImage }: Props) {
       body: JSON.stringify({ action: "resetStartDate" }),
     });
     fetchProgress();
+  }
+
+  async function handleMarkArticleRead(dayNumber: number) {
+    await fetch("/api/progress", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "markArticleRead", dayNumber }),
+    });
+    setProgress(prev => ({
+      ...prev,
+      articlesRead: { ...prev.articlesRead, [String(dayNumber)]: true },
+    }));
   }
 
   async function handleSignOut() {
@@ -175,6 +187,7 @@ export default function ClientApp({ userName, userImage }: Props) {
           onToggleTask={handleToggleTask}
           onSetStart={handleSetStart}
           onResetStart={handleResetStart}
+          onMarkArticleRead={handleMarkArticleRead}
         />
       )}
       {tab === "streak" && <StreakTab progress={progress} today={today} dayNumber={dayNumber} />}

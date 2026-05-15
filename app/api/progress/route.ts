@@ -124,5 +124,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
+  // Mark an article as read
+  if (body.action === "markArticleRead") {
+    const { dayNumber } = body;
+    if (!data.articlesRead) data.articlesRead = {};
+    data.articlesRead[String(dayNumber)] = true;
+    await writeProgress(userId, data);
+    return NextResponse.json({ ok: true });
+  }
+
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });
 }

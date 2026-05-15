@@ -3,6 +3,8 @@ import { useState } from "react";
 import { DayPlan, MONTH_NAMES, getDayPlan } from "@/lib/curriculum";
 import { ProgressData } from "@/lib/storage";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import ArticleViewer from "@/components/ArticleViewer";
+import { getArticle } from "@/lib/articles";
 
 interface Props {
   today: string;
@@ -14,6 +16,7 @@ interface Props {
   onToggleTask: (taskId: string, date: string) => void;
   onSetStart: (date: string) => void;
   onResetStart: () => void;
+  onMarkArticleRead: (dayNumber: number) => void;
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -43,12 +46,15 @@ type DialogType =
 
 export default function TodayTab({
   today, yesterday, dayNumber, plan, progress,
-  missedYesterday, onToggleTask, onSetStart, onResetStart,
+  missedYesterday, onToggleTask, onSetStart, onResetStart, onMarkArticleRead,
 }: Props) {
   const [startInput, setStartInput] = useState(today);
 
   // Day navigation: null = today, otherwise a day number offset from today
   const [viewingDay, setViewingDay] = useState<number>(dayNumber);
+
+  // Article overlay
+  const [showArticle, setShowArticle] = useState(false);
 
   // Confirmation dialog state
   const [dialog, setDialog] = useState<{
@@ -344,20 +350,52 @@ export default function TodayTab({
       </div>
 
       {/* Article of the day */}
-      {viewPlan?.article && (
-        <div className="card" style={{ borderColor: "#1e3a5f", marginBottom: "1rem" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
-            <span style={{ fontSize: "1.1rem" }}>📖</span>
-            <span style={{ color: "var(--blue)", fontWeight: 700, fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>Article of the Day</span>
-            <span style={{ color: "var(--muted)", fontSize: "0.75rem", marginLeft: "auto" }}>{viewPlan.article.readTime} read</span>
-          </div>
-          <a href={viewPlan.article.url} target="_blank" rel="noopener noreferrer"
-            style={{ color: "var(--text)", fontWeight: 600, fontSize: "0.95rem", textDecoration: "none", display: "block", marginBottom: "0.25rem" }}>
-            {viewPlan.article.title} ↗
-          </a>
-          <div style={{ color: "var(--muted)", fontSize: "0.75rem" }}>{viewPlan.article.source}</div>
-        </div>
-      )}
+      {(() => {
+        const article = getArticle(viewingDay);
+        const isRead = !!progress.articlesRead?.[String(viewingDay)];
+        if (!article) return null;
+        return (
+          <>
+            <div className="card" style={{ borderColor: isRead ? "var(--green)" : "#1e3a5f", marginBottom: "1rem", cursor: "pointer", transition: "border-color 0.15s" }}
+              onClick={() => setShowArticle(true)}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                <span style={{ fontSize: "1.1rem" }}>📖</span>
+                <span style={{ color: isRead ? "var(--green)" : "var(--blue)", fontWeight: 700, fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  {isRead ? "Read ✓" : "Article of the Day"}
+                </span>
+                <span style={{ color: "var(--muted)", fontSize: "0.75rem", marginLeft: "auto" }}>{article.readTime} read</span>
+              </div>
+              <div style={{ color: "var(--text)", fontWeight: 600, fontSize: "0.95rem", marginBottom: "0.25rem" }}>
+                {article.title}
+              </div>
+              <div style={{ color: "var(--muted)", fontSize: "0.75rem", marginBottom: "0.75rem" }}>{article.tldr}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <button
+                  onClick={e => { e.stopPropagation(); setShowArticle(true); }}
+                  className="btn btn-primary"
+                  style={{ padding: "0.4rem 1rem", fontSize: "0.8rem" }}>
+                  {isRead ? "Read again" : "Read now →"}
+                </button>
+                {!isRead && (
+                  <span style={{ fontSize: "0.72rem", color: "var(--muted)" }}>Includes quiz questions</span>
+                )}
+              </div>
+            </div>
+
+            {showArticle && (
+              <ArticleViewer
+                article={article}
+                alreadyRead={isRead}
+                onClose={() => setShowArticle(false)}
+                onComplete={() => {
+                  setShowArticle(false);
+                  onMarkArticleRead(viewingDay);
+                }}
+              />
+            )}
+          </>
+        );
+      })()}
 
       {/* Change start date */}
       <div className="card" style={{ marginTop: "0.5rem", borderStyle: "dashed" }}>
