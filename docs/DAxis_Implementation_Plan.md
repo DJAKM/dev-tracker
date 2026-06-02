@@ -1,30 +1,33 @@
-# DAxis Engineering Consultancy — Complete Implementation Plan
+# DAxis Engineering Consultancy — Website Implementation Plan
 
-**Version:** 2.0 (complete, standalone — client + backend-developer detail)
-**Date:** May 2026
-**Stack:** Next.js 15 (App Router) · TypeScript · Tailwind v4 + shadcn/ui · Supabase (Postgres) · Resend
-**Target repo:** new dedicated repository (this document is portable — copy `docs/` into it)
-**Status:** Planning complete. No app code yet — this is the build blueprint.
+This document is the complete planning reference for the DAxis Engineering
+Consultancy website. It is written for two audiences:
 
-> This document has two tracks: **PART I — Client Track** (non-technical, for DAxis / Sunil Sharma) and **PART II — Backend-Developer Track** (exhaustive technical detail). A full security-hardening section and a human-readable schema are included.
+- **Part I — Client Track:** plain-language overview for DAxis / Sunil Sharma.
+- **Part II — Backend-Developer Track:** exhaustive technical detail for the
+  developer who will build the site.
+
+The site will be built with **Next.js 15** (App Router, TypeScript) as a
+full-stack application, hosted on **Vercel + Supabase**, and lives in its own
+standalone repository (this document is portable into that new repo).
 
 ---
 
-# PART I — CLIENT TRACK (non-technical, for DAxis / Sunil Sharma)
+## PART I — CLIENT TRACK (non-technical, for DAxis / Sunil Sharma)
 
-## A. What you are getting (in plain language)
+### A. What you are getting (in plain language)
 - A professional one-page website (with smooth-scrolling sections) for DAxis Engineering Consultancy.
 - Sections: top menu bar, hero banner, key stats, 6 services, your consultant profile, 5 featured projects, scrolling client names, "why choose us", an enquiry form, and a footer.
 - A working **enquiry form**: when a visitor submits it, the lead is **saved in a database** and an **email alert** lands in `daxis.engg@gmail.com` instantly.
 - Works perfectly on **mobile, tablet, and desktop**.
 
-## B. How the enquiry flow works (your day-to-day)
+### B. How the enquiry flow works (your day-to-day)
 1. A visitor fills the form (name, email, phone, + optional company, service, city, message).
 2. You receive an email at `daxis.engg@gmail.com` titled "New Enquiry from [Name] — DAxis Website".
 3. Every lead is also stored permanently; you view/search them in the **Supabase dashboard** (a simple web table login).
 4. Each lead has a status you can change: New → Contacted → Qualified → Closed.
 
-## C. What we need from YOU before we start (content checklist)
+### C. What we need from YOU before we start (content checklist)
 | Item | Detail needed |
 |---|---|
 | Hero text | Main headline + one supporting line + 2 button labels |
@@ -37,7 +40,7 @@
 | Logo & brand | DAxis logo (PNG/SVG), preferred colors if different from PRD |
 | Contact | Confirm phone `+91-9910461833`, email `daxis.engg@gmail.com`, address |
 
-## D. Accounts you'll need (all free, we set them up with you)
+### D. Accounts you'll need (all free, we set them up with you)
 | Account | Purpose | Cost |
 |---|---|---|
 | Supabase | Stores all enquiries (the database) | Free |
@@ -47,29 +50,29 @@
 | Upstash | Prevents form abuse/flooding | Free |
 | Domain (optional) | e.g. `daxisengg.com` for a branded URL + branded email sender | ~₹800–1,200/yr (optional) |
 
-## E. Cost summary
+### E. Cost summary
 - **₹0/month** on free tiers — sufficient for years of normal traffic.
 - Only optional cost is a custom domain name (one-time yearly), recommended for credibility and branded emails.
 
-## F. Timeline (estimate)
+### F. Timeline (estimate)
 - **~7–10 working days** to a live public site (once content is provided).
 - +1–2 days if you want the optional in-house admin dashboard (otherwise you use Supabase's built-in table view).
 
-## G. What happens after launch (maintenance)
+### G. What happens after launch (maintenance)
 - The site runs itself; no servers to manage.
 - To edit services or text later, the developer makes a quick change (content is kept in simple files).
 - You'll get a short "how to read your leads" guide for the Supabase dashboard.
 
-## H. Privacy & data note
+### H. Privacy & data note
 - Enquiry data (name, email, phone, message) is stored securely; only DAxis (via the admin login) can read it.
 - We capture basic technical info (IP/browser) only to stop spam.
 - Recommended: add a one-line privacy note near the form.
 
 ---
 
-# PART II — BACKEND-DEVELOPER TRACK (exhaustive technical detail)
+## PART II — BACKEND-DEVELOPER TRACK (exhaustive technical detail)
 
-## I. Locked decisions
+### I. Locked decisions
 | # | Topic | Decision |
 |---|---|---|
 | D1 | Framework | Next.js 15.x App Router, TypeScript strict |
@@ -83,14 +86,41 @@
 | D9 | Anti-spam | Cloudflare Turnstile + honeypot + Upstash rate-limit |
 | D10 | Admin | Phase 6 (NextAuth-protected); v1 uses Supabase dashboard |
 | D11 | Hosting | Vercel + Supabase |
+| D12 | UI library | **shadcn/ui** (Radix + Tailwind, components owned in-repo). Themes via CSS variables → PRD palette maps in with **no breaking changes** and is **easily customizable** for future changes. MUI rejected (opinionated Material look, Emotion theming, no Tailwind, heavier to rebrand). |
+| D13 | Content model | **All page content is dynamic, served from an API (Supabase-backed).** No hardcoded `data/*.ts`. Every section (hero, stats, services, profile, projects, clients, USPs, contact info) is rendered from API responses so DAxis can edit content without a redeploy. |
+| D14 | Loading UX | **Splash screen** on initial app load + **per-section skeleton loaders** (shaped placeholders, not spinners) while each section's data is fetched. All gated by `prefers-reduced-motion`. |
+| D15 | Design source | **Figma Make** (`figma.com/make/C4cmIrNU1MBghzFX9DxScQ/DAxis-Engineering`) is the source of truth for sections, content fields, and visual design. Exact content schema (§V) is finalized against the Figma export. |
 
-## J. Architecture & request lifecycle
+### J. Architecture & request lifecycle
+
+**J1. Content read flow (dynamic page render — every section)**
+```
+Browser loads app → Splash screen (brand) shown while bootstrapping
+   ▼
+Page render: each section requests its content from the content API
+   GET /api/content/{section}  (or one batched GET /api/content)
+   ▼
+Next.js Server (Vercel function / Route Handler or RSC fetch)
+   1 Read from Supabase content tables (anon read, RLS: active rows only)
+   2 Shape into typed JSON contract (§V)
+   3 Cache: ISR/`revalidate` + CDN; stale-while-revalidate for instant repeat loads
+   ▼
+While a section's data is in-flight → render its SKELETON loader
+On resolve → swap skeleton for real content (Framer Motion fade)
+On error → friendly empty/error state + retry
+```
+Rendering strategy: content is fetched server-side (RSC) with ISR so the
+HTML ships pre-populated and SEO-safe; client components hydrate and use
+skeletons only for client-fetched/refetched data. The **splash screen**
+covers the very first paint; **skeletons** cover per-section data latency.
+
+**J2. Enquiry write flow (form submission)**
 ```
 Browser (Client Component form + Turnstile widget)
-   │ Server Action invocation (form fields)
+   │ Server Action invocation (multipart/form fields)
    ▼
 Next.js Server (Vercel function)
-   1 Upstash rate-limit (key = ip)         → friendly error if exceeded
+   1 Upstash rate-limit (key = ip)         → 429-style friendly error if exceeded
    2 Honeypot check (website field empty?) → if filled: record is_spam, return ok, skip email
    3 Turnstile siteverify (server→CF)       → reject on failure
    4 Zod parse/validate                     → field errors returned to form
@@ -103,9 +133,10 @@ Next.js Server (Vercel function)
    ▼
 Supabase Postgres   +   Resend API → daxis.engg@gmail.com
 ```
-Marketing pages are static/ISR (CDN). Only the action hits server + DB.
+Content is dynamic but cacheable (ISR/CDN). Only the write action and
+uncached content reads hit server+DB.
 
-## K. Database schema — full runnable SQL (`supabase/migrations/0001_init.sql`)
+### K. Database schema — full runnable SQL (`supabase/migrations/0001_init.sql`)
 ```sql
 create extension if not exists "pgcrypto";
 
@@ -185,7 +216,77 @@ create policy "services public read" on services for select to anon using (is_ac
 -- no anon/authenticated policies on enquiries/enquiry_events/email_log => blocked; service_role bypasses RLS
 ```
 
-## L. Seed (`supabase/seed.sql`)
+### K2. Dynamic content schema — full SQL (`supabase/migrations/0002_content.sql`)
+> All page content is dynamic and served from these tables via the content API (§V).
+> Public read is anon + RLS-limited to active rows; only admin/service_role writes.
+> Final column set is reconciled against the Figma export (D15) before build.
+```sql
+-- 1) Singleton/section content as flexible JSON (hero, stats labels, about/profile,
+--    why-choose-us heading, contact info, SEO, splash config). One row per section key.
+create table site_content (
+  key text primary key,              -- e.g. 'hero','stats','consultant','why_choose_us','contact','seo','splash'
+  data jsonb not null,               -- shape defined per-section in §V
+  is_published boolean not null default true,
+  updated_at timestamptz not null default now()
+);
+
+-- 2) Repeating collections (ordered lists rendered as cards/marquee items)
+create table projects (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  client text,
+  description text,
+  year int,
+  image_url text,
+  tags text[],
+  sort_order int not null default 0,
+  is_active boolean not null default true,
+  updated_at timestamptz not null default now()
+);
+
+create table clients (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  logo_url text,
+  website_url text,
+  sort_order int not null default 0,
+  is_active boolean not null default true,
+  updated_at timestamptz not null default now()
+);
+
+create table usps (                  -- "Why choose us" points
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  description text,
+  icon text,                         -- lucide icon name
+  sort_order int not null default 0,
+  is_active boolean not null default true,
+  updated_at timestamptz not null default now()
+);
+-- NOTE: `services` (in 0001) already powers both the Services section and the
+-- contact-form dropdown — extend it with display fields used by the section:
+alter table services add column if not exists icon text;
+alter table services add column if not exists image_url text;
+alter table services add column if not exists short_tagline text;
+
+-- reuse the updated_at trigger from 0001 on each content table
+create trigger trg_site_content_updated before update on site_content for each row execute function set_updated_at();
+create trigger trg_projects_updated     before update on projects     for each row execute function set_updated_at();
+create trigger trg_clients_updated       before update on clients      for each row execute function set_updated_at();
+create trigger trg_usps_updated          before update on usps         for each row execute function set_updated_at();
+
+-- RLS: public can read published/active content; writes are service_role/admin only
+alter table site_content enable row level security;
+alter table projects     enable row level security;
+alter table clients       enable row level security;
+alter table usps          enable row level security;
+create policy "site_content public read" on site_content for select to anon using (is_published = true);
+create policy "projects public read"     on projects     for select to anon using (is_active = true);
+create policy "clients public read"       on clients      for select to anon using (is_active = true);
+create policy "usps public read"          on usps         for select to anon using (is_active = true);
+```
+
+### L. Seed (`supabase/seed.sql`)
 ```sql
 insert into services (slug,name,sort_order) values
  ('engineering-design','Engineering Design & Drafting',1),
@@ -198,7 +299,7 @@ insert into services (slug,name,sort_order) values
 on conflict (slug) do nothing;
 ```
 
-## L2. Schema in table form (human-readable — how data is stored & linked)
+### L2. Schema in table form (human-readable)
 
 **Table: `enquiries`** — one row per lead submitted from the website.
 | Column | Type | Required | Default | Notes |
@@ -273,7 +374,7 @@ services (1) ────< (many) enquiries (1) ────< (many) enquiry_eve
 ```
 Read as: one **service** can be chosen by many **enquiries**; one **enquiry** generates many **events** and many **email_log** entries.
 
-## M. TypeScript contracts (exact shapes)
+### M. TypeScript contracts (exact shapes)
 ```ts
 // lib/validation/enquiry.ts
 export const enquirySchema = z.object({
@@ -295,7 +396,7 @@ type SubmitResult =
   | { ok: false; formError?: string; fieldErrors?: Record<string,string> };
 ```
 
-## N. Module responsibilities & signatures
+### N. Module responsibilities & signatures
 | File | Responsibility | Key export |
 |---|---|---|
 | `lib/supabase/server.ts` | Build service_role client (server only) | `createServiceClient(): SupabaseClient` |
@@ -304,16 +405,21 @@ type SubmitResult =
 | `lib/turnstile.ts` | CF siteverify call | `verifyTurnstile(token, ip): Promise<boolean>` |
 | `lib/email/resend.ts` | Build+send admin email | `sendEnquiryEmail(record): Promise<{id?:string;error?:string}>` |
 | `lib/email/template.ts` | HTML body w/ escaping | `enquiryEmailHtml(record): string` |
-| `lib/actions/submit-enquiry.ts` | Orchestrate J-flow | `submitEnquiry(prevState, formData): Promise<SubmitResult>` |
-| `data/*.ts` | Static content objects | `services`, `projects`, `clients`, `usps`, `consultant` |
+| `lib/actions/submit-enquiry.ts` | Orchestrate J2-flow | `submitEnquiry(prevState, formData): Promise<SubmitResult>` |
+| `lib/content/queries.ts` | Typed content reads from Supabase (anon client) | `getSiteContent(key)`, `getProjects()`, `getClients()`, `getUsps()`, `getServices()` |
+| `lib/content/schema.ts` | Zod schemas validating each section's JSON shape (§V) | `heroSchema`, `statsSchema`, `consultantSchema`, … |
+| `app/api/content/[section]/route.ts` | Public content API (cached, ISR) | `GET` → typed JSON per section |
+| `components/skeletons/*` | Per-section skeleton loaders | `HeroSkeleton`, `ServicesSkeleton`, `ProjectsSkeleton`, … |
+| `components/SplashScreen.tsx` | Brand splash on initial load | `<SplashScreen />` |
+| ~~`data/*.ts`~~ | **Removed** — content is dynamic from the API/DB, not static files | — |
 
-## O. External integration details
+### O. External integration details
 - **Turnstile verify:** `POST https://challenges.cloudflare.com/turnstile/v0/siteverify` body `{ secret, response: token, remoteip }`; success on `json.success === true`.
 - **Resend:** `POST https://api.resend.com/emails` header `Authorization: Bearer RESEND_API_KEY`, body `{ from: EMAIL_FROM, to:[ADMIN_EMAIL], subject, html }`; capture returned `id`.
 - **Upstash:** `@upstash/ratelimit` `Ratelimit.slidingWindow(5,'10 m')` backed by `@upstash/redis` from REST env vars.
 - **IP source on Vercel:** `x-forwarded-for` (first hop) via `headers()`.
 
-## P. Error handling & edge cases (must-handle)
+### P. Error handling & edge cases (must-handle)
 | Case | Behaviour |
 |---|---|
 | Rate limit exceeded | Return `{ ok:false, formError:'Too many attempts, try again shortly.' }`, no DB write |
@@ -326,7 +432,7 @@ type SubmitResult =
 | service_id not found | Treat as null; `service_label=null` |
 | Email injection | HTML-escape every interpolated value in template |
 
-## P2. Security hardening (full — required, not optional)
+### P2. Security hardening (full — required, not optional)
 
 **1. Secrets & key management**
 - `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`, `UPSTASH_*` are **server-only** — never prefixed `NEXT_PUBLIC_`, never imported into a Client Component.
@@ -355,7 +461,7 @@ type SubmitResult =
 - Every interpolated value in the email HTML is **HTML-escaped**; subject derived from validated `full_name` only — no newlines/headers from user input → no header/HTML injection.
 
 **6. HTTP security headers (set in `next.config.ts`)**
-- `Content-Security-Policy` (allow self + Turnstile + Supabase + Resend domains only; avoid inline scripts / use nonces).
+- `Content-Security-Policy` (allow self + Turnstile + Supabase + Resend domains only; no inline scripts where avoidable / use nonces).
 - `Strict-Transport-Security` (HSTS, includeSubDomains, preload).
 - `X-Frame-Options: DENY` (+ CSP `frame-ancestors 'none'`) — anti-clickjacking.
 - `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (disable camera/mic/geo).
@@ -395,14 +501,38 @@ type SubmitResult =
 - [ ] Security headers present (test via securityheaders.com)
 - [ ] HTTPS + HSTS active; no mixed content
 - [ ] 2FA enabled on all provider accounts
-- [ ] Email template escapes a payload like `<script>` / `\nBcc:`
+- [ ] Email template escapes a payload like `<script>`/`\nBcc:`
 - [ ] Admin allowlist enforced; non-admin OAuth user denied
 - [ ] Dependency audit clean
 - [ ] Privacy notice live; retention job scheduled
 
-## Q. Frontend / UI specifics
-- **Sections (order):** Header(sticky) → Hero → StatsBar → Services(6, grid 1/2/3) → ConsultantProfile → Projects(5) → ClientMarquee(11) → WhyChooseUs(5) → ContactForm → Footer.
-- **Libraries:** Tailwind v4, shadcn/ui (Radix), Framer Motion, react-hook-form + `@hookform/resolvers/zod`, react-countup, lucide-react, `@marsidev/react-turnstile`.
+### Q0. UI component library & theming (shadcn/ui — fits PRD colors, no breaking changes)
+- **Why shadcn/ui:** unstyled Radix primitives themed entirely via CSS variables → the PRD palette becomes the theme and **every** component (button, input, select, dialog, toast, badge) inherits it. No override war with a built-in design language; easy to rebrand later by editing a few variables. Component source lives in-repo (`components/ui/*`), so it's owned and future-flexible — not a node_modules black box.
+- **Why not MUI:** ships an opinionated Material look themed via Emotion/MUI System (not Tailwind). Hitting the dark industrial/blueprint aesthetic means heavy theme overrides, a heavier bundle, and higher risk of fighting the brand look.
+- **Map PRD tokens → shadcn theme variables** in `globals.css` (HSL is shadcn convention; exact hues finalized to match hex at build):
+  ```css
+  :root {
+    --background: 210 60% 10%;       /* #0A1628 primary navy   */
+    --foreground: 0 0% 100%;         /* #FFFFFF text-primary   */
+    --card: 213 62% 15%;             /* #0F2040 surface        */
+    --primary: 18 100% 58%;          /* #FF6B2B accent orange  */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 202 69% 38%;        /* #1E6FA5 steel blue     */
+    --muted-foreground: 205 19% 73%; /* #B0BEC5 text-secondary */
+    --destructive: 0 84% 60%;        /* #EF4444 error          */
+    --ring: 18 100% 58%;             /* focus ring = accent    */
+    --radius: 0.5rem;
+    /* brand extras: --success 142 71% 45% (#22C55E); --surface-light #F4F6F9 */
+  }
+  ```
+- **Reusability:** shared primitives in `components/ui/`; DAxis compositions in `components/daxis/` consume them (DRY, consistent, swappable).
+- **Install:** `npx shadcn@latest init`; add only what's used: `button input textarea select label dialog sonner badge`. Pairs natively with Tailwind v4 + Framer Motion.
+
+### Q. Frontend/UI specifics
+- **All sections are data-driven** (D13) — every section fetches its content from the content API (§V) and shows a **skeleton** until data resolves.
+- **Splash + skeletons (D14):** initial load shows a brand **SplashScreen** (logo on `--primary` navy, dismissed on first paint/hydration or min 600–900ms, whichever later, then fades out); each section renders its own **skeleton loader** while its data is in flight. See §W for the full spec.
+- **Sections (order):** Header(sticky) → Hero → StatsBar → Services(grid 1/2/3) → ConsultantProfile → Projects → ClientMarquee → WhyChooseUs → ContactForm → Footer. (Counts like "6 services / 5 projects / 11 clients" are now driven by the API data, not fixed.)
+- **Libraries:** Tailwind v4, **shadcn/ui (Radix — chosen UI library, see Q0; `Skeleton` component included)**, Framer Motion, react-hook-form + `@hookform/resolvers/zod`, react-countup, lucide-react, `@marsidev/react-turnstile`.
 - **Fonts (`next/font/google`):** Bebas Neue (hero), Rajdhani (headings), DM Sans (body), Space Mono (badges).
 - **Color tokens → `globals.css`:** `--primary #0A1628`, `--accent #FF6B2B`, `--accent-secondary #1E6FA5`, `--surface #0F2040`, `--surface-light #F4F6F9`, `--text-primary #FFF`, `--text-secondary #B0BEC5`, `--success #22C55E`, `--error #EF4444`.
 - **Form states:** Default → Loading (spinner, disabled, "Sending…") → Success (green banner, reset) → Error (red banner + phone). Live 500-char counter on message.
@@ -410,20 +540,28 @@ type SubmitResult =
 - **A11y:** semantic landmarks, labeled inputs, focus-visible rings, AA contrast, aria-live on banners.
 - **SEO:** `metadata` API, `opengraph-image.tsx`, JSON-LD `Organization`/`LocalBusiness`, `sitemap.ts`, `robots.ts`, manifest/favicon.
 
-## R. Project structure & dependencies
+### R. Project structure & dependencies
 ```
-app/ layout.tsx page.tsx api/enquiries/route.ts(optional) admin/page.tsx(Phase6)
+app/ layout.tsx page.tsx admin/page.tsx(Phase6)
+     api/enquiries/route.ts(optional)
+     api/content/[section]/route.ts        # public dynamic content API (§V)
      sitemap.ts robots.ts opengraph-image.tsx
+components/ui/ (shadcn primitives: button input textarea select label dialog sonner badge skeleton)
+components/SplashScreen.tsx                  # initial brand splash (D14)
 components/daxis/ Header StatsBar Hero ServiceCard ConsultantProfile
                  ProjectCard ClientMarquee USPCard ContactForm Toast
-lib/ supabase/server.ts validation/enquiry.ts rate-limit.ts turnstile.ts
+components/skeletons/ HeroSkeleton StatsSkeleton ServicesSkeleton
+                 ConsultantSkeleton ProjectsSkeleton ClientsSkeleton UspsSkeleton
+lib/ supabase/server.ts supabase/anon.ts validation/enquiry.ts rate-limit.ts turnstile.ts
      email/{resend,template}.ts actions/submit-enquiry.ts
-data/ services.ts projects.ts clients.ts usps.ts consultant.ts
-supabase/ migrations/0001_init.sql seed.sql
+     content/queries.ts content/schema.ts      # dynamic content reads + Zod shapes (§V)
+supabase/ migrations/0001_init.sql migrations/0002_content.sql seed.sql
 ```
+> No `data/*.ts` — content lives in Supabase content tables (§K2) and is served via the content API (§V).
+
 Deps: `next@^15 react@^19 react-dom@^19 @supabase/supabase-js resend zod react-hook-form @hookform/resolvers framer-motion react-countup lucide-react @marsidev/react-turnstile @upstash/ratelimit @upstash/redis`; dev: `typescript @types/* tailwindcss@^4 @tailwindcss/postcss`; shadcn via `npx shadcn@latest init`.
 
-## S. Environment variables (`.env.example`) — with where to get each
+### S. Environment variables (`.env.example`) — with where to get each
 ```
 NEXT_PUBLIC_SUPABASE_URL=          # Supabase → Project Settings → API
 NEXT_PUBLIC_SUPABASE_ANON_KEY=     # same page (only if client read added)
@@ -438,48 +576,62 @@ UPSTASH_REDIS_REST_URL=            # console.upstash.com → Redis → REST
 UPSTASH_REDIS_REST_TOKEN=
 ```
 
-## T. Build phases, testing, deployment
-**Phases:** 0 Foundations(0.5d) → 1 DB(0.5d) → 2 Backend(1–1.5d) → 3 Marketing site(2–3d) → 4 Contact form(1d) → 5 SEO/a11y/polish(0.5–1d) → 6 Admin(optional 1–2d) → 7 Deploy(0.5d). **~7–10d to launch.**
+### V. Dynamic content API & contracts (D13)
+All page content is served from the content API and validated with Zod (`lib/content/schema.ts`) on read so a bad/edited DB row can never crash the page.
+
+**Endpoints** (cached with ISR + `revalidate`, CDN-fronted; anon read only):
+| Route | Returns | Source |
+|---|---|---|
+| `GET /api/content/hero` | `{ headline, subline, primaryCta, secondaryCta, bgImageUrl? }` | `site_content` key `hero` |
+| `GET /api/content/stats` | `[{ label, value, suffix? }]` | `site_content` key `stats` |
+| `GET /api/content/services` | `[{ id, slug, name, short_tagline, description, icon, image_url }]` | `services` (active, ordered) |
+| `GET /api/content/consultant` | `{ name, title, bio, photoUrl, software: string[] }` | `site_content` key `consultant` |
+| `GET /api/content/projects` | `[{ id, title, client, description, year, image_url, tags }]` | `projects` (active, ordered) |
+| `GET /api/content/clients` | `[{ id, name, logo_url, website_url }]` | `clients` (active, ordered) |
+| `GET /api/content/why-choose-us` | `{ heading, items:[{ title, description, icon }] }` | `site_content` `why_choose_us` + `usps` |
+| `GET /api/content/contact` | `{ phone, email, address, mapUrl?, hours? }` | `site_content` key `contact` |
+| `GET /api/content/seo` | `{ title, description, ogImageUrl, jsonLd }` | `site_content` key `seo` |
+| `GET /api/content/splash` | `{ enabled, minMs, logoUrl, tagline? }` | `site_content` key `splash` |
+| `GET /api/content` | Batched object of all of the above (single round-trip option) | all |
+
+- **Caching:** `export const revalidate = 300` (5 min) per route + `Cache-Control: s-maxage, stale-while-revalidate` so repeat loads are instant and content edits propagate within the window. Admin edits can trigger on-demand `revalidatePath`/`revalidateTag` for instant refresh.
+- **Read path:** server components call `lib/content/queries.ts` directly (RSC, no HTTP hop) so first HTML is pre-populated & SEO-safe; the `/api/content/*` routes exist for client-side refetch and external use.
+- **Validation/fallbacks:** each response parsed by its Zod schema; on parse failure the section renders a safe empty/error state, logs server-side, and never throws to the client.
+- **Exact field names** are reconciled against the Figma export (D15) before Phase 2 — the shapes above are the working contract.
+
+### W. Loading experience — splash screen & skeletons (D14)
+- **SplashScreen (`components/SplashScreen.tsx`):**
+  - Full-screen brand overlay on `--primary` navy with the DAxis logo + subtle motion (logo fade/scale, optional blueprint-grid shimmer).
+  - Config from `GET /api/content/splash` (`enabled`, `minMs`, `logoUrl`); default `minMs` 600–900ms.
+  - Dismiss = `max(appHydrated, minMs)` then Framer Motion fade-out; mounted in `app/layout.tsx` so it covers first paint.
+  - `prefers-reduced-motion`: static logo, no animation, shorter hold.
+  - A11y: `role="status"`, `aria-busy`, focus not trapped; removed from DOM after exit.
+- **Per-section skeletons (`components/skeletons/*`, built on shadcn `Skeleton`):**
+  - Each section shows a shaped placeholder matching its real layout (e.g. Services = grid of card skeletons; ClientMarquee = row of logo bars; Hero = headline + button bars; Stats = number blocks).
+  - Server-rendered sections use Next.js `loading.tsx` / React `<Suspense fallback={<XSkeleton/>}>`; client-refetched sections toggle skeleton on `isLoading`.
+  - Skeletons use a `prefers-reduced-motion`-aware shimmer (static when reduced).
+  - **Error/empty states:** if a section's fetch fails or returns empty, show a minimal friendly message (not a broken layout) with optional retry; never block the rest of the page.
+- **Acceptance:** no layout shift between skeleton → content (reserve dimensions); splash never blocks > its min + first paint; all loading animations honor reduced-motion.
+
+### T. Build phases, testing, deployment
+**Phases:** 0 Foundations(0.5d) → 1 DB incl. content tables(0.75d) → 2 Backend + content API/queries(1.5–2d) → 3 Dynamic marketing site w/ splash + skeletons(2.5–3.5d) → 4 Contact form(1d) → 5 SEO/a11y/polish(0.5–1d) → 6 Admin content editor + leads(optional 2–3d) → 7 Deploy(0.5d). **~8–11d to launch.**
 
 **Testing:**
-- Unit: Zod per-field valid/invalid; email HTML escaping.
-- Integration: action happy path (row+email), honeypot, Turnstile fail, rate-limit trip, email-fail-still-saves.
-- E2E (Playwright): fill → success → row in Supabase → email received.
-- Manual: responsive 375/768/1280, keyboard nav, reduced-motion, Lighthouse ≥90.
+- Unit: Zod per-field valid/invalid; email HTML escaping; **content section schemas (valid/malformed DB row → safe fallback)**.
+- Integration: action happy path (row+email), honeypot, Turnstile fail, rate-limit trip, email-fail-still-saves; **content API returns shaped JSON, cache headers present, empty table → empty state**.
+- E2E (Playwright): fill→success→row in Supabase→email received; **splash shows then dismisses; each section shows skeleton then real content; section fetch error → friendly state without breaking page**.
+- Manual: responsive 375/768/1280, keyboard nav, reduced-motion (splash + skeletons static), no layout shift skeleton→content, Lighthouse ≥90.
 
 **Deployment runbook:**
-1. Supabase: run migration + seed; copy URL/keys.
-2. Resend: API key (later verify domain + DNS).
-3. Turnstile: site key + secret.
-4. Upstash: REST URL + token.
-5. Vercel: import repo, add env (§S), deploy.
-6. Custom domain → Vercel; switch `EMAIL_FROM` to verified domain.
-7. Smoke test: submit enquiry → confirm DB row + admin email.
+1. Supabase: run migration+seed; copy URL/keys. 2. Resend: API key (later verify domain+DNS). 3. Turnstile: site key+secret. 4. Upstash: REST URL+token. 5. Vercel: import repo, add env (§S), deploy. 6. Custom domain → Vercel; switch `EMAIL_FROM` to verified domain. 7. Smoke test: submit enquiry → confirm DB row + admin email.
 
-## U. Future roadmap
-Admin CRM (status/notes/assignment) · email retry worker (Vercel Cron/Edge Function draining `notified=false`) · auto-reply to enquirer · WhatsApp/SMS alert · analytics · file upload (Supabase Storage) for RFQ drawings · multi-select services · i18n.
+### U. Future roadmap
+Admin **content editor UI** (edit hero/stats/services/projects/clients/USPs/contact + reorder + publish toggles, with on-demand revalidation) · Admin CRM (status/notes/assignment) · email retry worker (Vercel Cron/Edge Function draining `notified=false`) · auto-reply to enquirer · WhatsApp/SMS alert · analytics · file/image upload (Supabase Storage) for projects/clients/RFQ drawings · multi-select services · i18n.
 
 ---
 
-## Acceptance Criteria Mapping (PRD §10)
-| PRD criterion | Covered by |
-|---|---|
-| 7-field insert into Supabase | §K schema + Phase 4 form/action |
-| Client-side required validation | §M Zod + react-hook-form |
-| Email alert on submission | §O Resend (Phase 2) |
-| Success/error states | Phase 4 + Toast |
-| 6 services displayed | §L seed, data-driven |
-| Responsive ≥375px | §Q / Phase 3 |
-| service_role server-only / anon safe | §P2 security |
-| Sticky header + smooth scroll | Phase 3 layout |
-| Hero/stats/marquee/hover/loading anims | Phase 3/4 Framer Motion |
-| SEO meta tags | Phase 5 |
-
-## Loose ends / notes
-- Client content (PART I §C) required before Phase 3.
-- Launch on `onboarding@resend.dev`; switch to verified domain when DNS ready.
-- This document is portable — copy `docs/` into the new DAxis repository as the build blueprint.
-
----
-
-*End of plan — DAxis Engineering Consultancy. Stack: Next.js 15 full-stack · Supabase · Resend. Secure by design, scalable by default.*
+## Notes / loose ends
+- GitHub access in the current session is scoped to `djakm/dev-tracker`; the new DAxis repo must be scaffolded from a session pointed at it.
+- **All content is dynamic** (D13) via the content API (§V); **splash + skeletons** (D14, §W) cover loading. No static content files.
+- **Figma Make link (D15)** is the design/content source of truth. The Figma Make URL is a JS/auth-gated app and can't be fetched/scraped server-side — the **exact content fields + section list must be exported or pasted** to finalize §K2/§V before Phase 2.
+- Launch on `onboarding@resend.dev`; switch to a verified domain when DNS is ready.
